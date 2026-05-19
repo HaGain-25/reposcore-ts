@@ -1,0 +1,30 @@
+# reposcore-ts
+
+`reposcore-ts`는 GraphQL을 사용하여 오픈소스 수업 저장소의 학생 참여 점수를 계산하는 **TypeScript 기반 CLI**입니다.
+
+
+## Usage
+
+### 의존성 설치
+
+```bash
+bun install
+```
+
+### CLI 실행
+
+여러 개의 저장소를 한 번에 분석할 수 있습니다.
+
+```bash
+# 기본 실행 예시
+bun run index.ts <owner/repo...> [options]
+
+# GitHub 개인 액세스 토큰(PAT) 사용 예시
+bun run index.ts oss2026hnu/reposcore-ts --token YOUR_GITHUB_TOKEN
+```
+
+## Synopsis
+
+<!-- SYNOPSIS_START -->
+
+<!-- SYNOPSIS_END -->
