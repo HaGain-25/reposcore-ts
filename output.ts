@@ -58,9 +58,7 @@ const USER_CSV_HEADERS = [
 
 // 사용자별 집계 점수를 CSV 텍스트로 만듭니다.
 // 헤더와 행 스키마는 README.md의 안내(기본 실행 시 사용자별 점수 CSV)와 동일합니다.
-export const buildUserScoresCsv = (
-  users: ReadonlyArray<UserScore>,
-): string => {
+export const buildUserScoresCsv = (users: ReadonlyArray<UserScore>): string => {
   const rows = users.map(user => {
     let prFeatureBug = 0;
     let prDocs = 0;
@@ -103,6 +101,29 @@ export const buildRepoSummariesTxt = (
   return blocks.join('\n\n') + '\n';
 };
 
+// 💡 추가된 함수: 사용자별 점수 집계 결과를 사람이 읽기 쉬운 TXT 블록으로 변환합니다.
+export const buildUserScoresTxt = (users: ReadonlyArray<UserScore>): string => {
+  const lines = users.map(user => {
+    let prFeatureBug = 0;
+    let prDocs = 0;
+    let prTypo = 0;
+    let issueFeatureBug = 0;
+    let issueDocs = 0;
+    for (const repo of user.repoScores) {
+      for (const data of repo.scoreData) {
+        prFeatureBug += data.prFeatureBug;
+        prDocs += data.prDocs;
+        prTypo += data.prTypo;
+        issueFeatureBug += data.issueFeatureBug;
+        issueDocs += data.issueDocs;
+      }
+    }
+    return `- ${user.userId}: totalScore=${user.totalScore}, PR(feature/bug)=${prFeatureBug}, PR(docs)=${prDocs}, PR(typo)=${prTypo}, Issue(feature/bug)=${issueFeatureBug}, Issue(docs)=${issueDocs}`;
+  });
+
+  return ['User Scores', ...lines].join('\n') + '\n';
+};
+
 export interface ScoreOutputData {
   userScores: ReadonlyArray<UserScore>;
   repoSummaries: ReadonlyArray<RepoSummary>;
@@ -120,7 +141,11 @@ export const writeOutputFiles = async (
   await Bun.write(paths.csv, buildUserScoresCsv(data.userScores));
 
   if (format === 'txt') {
-    await Bun.write(paths.txt, buildRepoSummariesTxt(data.repoSummaries));
+    // 💡 기존 저장소 요약 하단에 사용자별 점수 요약본을 개행('\n')으로 결합하여 저장합니다.
+    const repoSummariesTxt = buildRepoSummariesTxt(data.repoSummaries);
+    const userScoresTxt = buildUserScoresTxt(data.userScores);
+
+    await Bun.write(paths.txt, repoSummariesTxt + '\n' + userScoresTxt);
     return paths;
   }
 
