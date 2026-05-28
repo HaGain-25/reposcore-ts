@@ -20,7 +20,7 @@ interface PageInfo {
 interface IssuePageResponse {
   repository: {
     issues: {
-      nodes: RawIssue[];
+      nodes: (RawIssue & {stateReason: string | null})[];
       pageInfo: PageInfo;
     };
   };
@@ -41,7 +41,7 @@ const PAGE_SIZE = 100;
 // 소문자 변환 후 하이픈/공백/언더스코어를 제거해 매칭합니다.
 export const normalizeLabel = (label: string): ContributionLabel => {
   const key = label.toLowerCase().replace(/[-_\s]/g, '');
-  if (key === 'feat' || key === 'feature') return 'feature';
+  if (key === 'feat' || key === 'feature' || key === 'enhancement') return 'feature';
   if (key === 'bug') return 'bug';
   if (key === 'doc' || key === 'docs' || key === 'documentation') return 'doc';
   if (key === 'typo') return 'typo';
@@ -111,7 +111,7 @@ export const createGitHubService = (token: string) => {
     },
   });
 
-  const getAllClosedIssues = async (
+  const getAllIssues = async (
     owner: string,
     repo: string,
   ): Promise<IssueRecord[]> => {
@@ -133,7 +133,6 @@ export const createGitHubService = (token: string) => {
             issues(
               first: $pageSize
               after: $cursor
-              states: CLOSED
               orderBy: {field: CREATED_AT, direction: DESC}
             ) {
               nodes {
@@ -141,6 +140,7 @@ export const createGitHubService = (token: string) => {
                 title
                 url
                 state
+                stateReason
                 createdAt
                 closedAt
                 author { login }
@@ -160,7 +160,12 @@ export const createGitHubService = (token: string) => {
       const connection: IssuePageResponse['repository']['issues'] =
         response.repository.issues;
 
-      issues.push(...connection.nodes.map(toIssueRecord));
+      // 'not planned'와 'duplicate' 사유로 닫힌 이슈를 필터링합니다.
+      const validNodes = connection.nodes.filter(
+        node => node.stateReason !== 'NOT_PLANNED' && node.stateReason !== 'DUPLICATE'
+      );
+
+      issues.push(...validNodes.map(toIssueRecord));
 
       cursor = connection.pageInfo.endCursor;
       hasNextPage = connection.pageInfo.hasNextPage && cursor !== null;
@@ -240,7 +245,7 @@ export const createGitHubService = (token: string) => {
     if (cached) return cached.data;
 
     const [issues, prs] = await Promise.all([
-      getAllClosedIssues(owner, repo),
+      getAllIssues(owner, repo),
       getAllMergedPullRequests(owner, repo),
     ]);
 

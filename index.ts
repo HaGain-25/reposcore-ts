@@ -1,5 +1,5 @@
 import { cac } from "cac";
-import pkg from "./package.json" assert { type: "json"};
+import pkg from "./package.json" with { type: "json"};
 
 import {createGitHubService} from './github-service';
 import {ScoreCalculator, type RepoData} from './score-calculator';
@@ -8,10 +8,6 @@ import type {RepoSummary} from './output';
 
 const cli = cac("reposcore-ts");
 cli.version(pkg.version);
-
-
-
-
 
 const supportedFormats = ['csv', 'txt'] as const;
 type SupportedFormat = (typeof supportedFormats)[number];
