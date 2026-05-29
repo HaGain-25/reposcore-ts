@@ -162,7 +162,7 @@ export const createGitHubService = (token: string) => {
 
       // 'not planned'와 'duplicate' 사유로 닫힌 이슈를 필터링합니다.
       const validNodes = connection.nodes.filter(
-        node => node.stateReason !== 'NOT_PLANNED' && node.stateReason !== 'DUPLICATE'
+        node => node.stateReason === 'COMPLETED'
       );
 
       issues.push(...validNodes.map(toIssueRecord));
