@@ -116,8 +116,8 @@ export const buildRepoSummariesTxt = (
   const blocks = summaries.map(s =>
     [
       `[${s.repoPath}]`,
-      `Merged PRs - feature: ${s.mergedPrFeatureBug}, docs: ${s.mergedPrDocs}, typo: ${s.mergedPrTypo}`,
-      `Closed Issues - feature: ${s.closedIssueFeatureBug}, docs: ${s.closedIssueDocs}`,
+      `Merged PRs - feature/bug: ${s.mergedPrFeatureBug}, docs: ${s.mergedPrDocs}, typo: ${s.mergedPrTypo}`,
+      `Closed Issues - feature/bug: ${s.closedIssueFeatureBug}, docs: ${s.closedIssueDocs}`,
     ].join('\n'),
   );
   return blocks.join('\n\n') + '\n';
