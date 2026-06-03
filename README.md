@@ -42,7 +42,7 @@ For more info, run any command with the `--help` flag:
 
 Options:
   --token <token>       GitHub Personal Access Token (default: $GITHUB_TOKEN)
-  --format <format>     출력 형식 (csv, txt) (default: csv)
+  --format <format>     출력 형식 (csv, txt, html) (default: csv)
   --output-dir <path>   결과 파일을 저장할 디렉터리 (default: output)
   --no-cache            캐시를 무시하고 GitHub API를 새로 호출합니다 (default: true)
   --sort-by <field>     정렬 기준 (score, id) (default: score)

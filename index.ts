@@ -33,7 +33,7 @@ cli
   .option('--token <token>', 'GitHub Personal Access Token', {
     default: '$GITHUB_TOKEN',
   })
-  .option('--format <format>', '출력 형식 (csv, txt)', {
+  .option('--format <format>', '출력 형식 (csv, txt, html)', {
     default: 'csv',
   })
   .option('--output-dir <path>', '결과 파일을 저장할 디렉터리', {
@@ -82,7 +82,7 @@ cli
 
       if (!supportedFormats.includes(format as SupportedFormat)) {
         errors.push(
-          `오류: 지원하지 않는 출력 형식 '${options.format}'입니다. csv 또는 txt를 입력하세요.`,
+          `오류: 지원하지 않는 출력 형식 '${options.format}'입니다. csv, txt 또는 html을 입력하세요.`,
         );
       }
 
@@ -170,8 +170,11 @@ cli
             subDir,
           );
           console.error(`[${repoPath}] CSV 저장: ${written.csv}`);
-          if ('txt' in written) {
+          if (written.txt) {
             console.error(`[${repoPath}] TXT 저장: ${written.txt}`);
+          }
+          if (written.html) {
+            console.error(`[${repoPath}] HTML 저장: ${written.html}`);
           }
         } catch (error: unknown) {
           const errorMessage =
@@ -198,8 +201,11 @@ cli
         outputDir,
       );
       console.error(`[합산] CSV 저장: ${written.csv}`);
-      if ('txt' in written) {
+      if (written.txt) {
         console.error(`[합산] TXT 저장: ${written.txt}`);
+      }
+      if (written.html) {
+        console.error(`[합산] HTML 저장: ${written.html}`);
       }
     },
   );
