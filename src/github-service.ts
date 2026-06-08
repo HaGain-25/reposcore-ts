@@ -70,8 +70,6 @@ interface PullRequestSearchResponse {
   };
 }
 
-const PAGE_SIZE = 100;
-
 /**
  * GitHub 라벨명을 내부 기여 카테고리로 정규화합니다.
  * @param label 정규화할 GitHub 라벨명
@@ -214,7 +212,7 @@ export const countByCategory = (
  * @param token GitHub Personal Access Token
  * @returns 저장소 상세 데이터와 이슈 선점 현황을 조회하는 서비스 객체
  */
-export const createGitHubService = (token: string) => {
+export const createGitHubService = (token: string, pageSize = 100) => {
   const githubGraphQL = graphql.defaults({
     headers: {
       authorization: `token ${token}`,
@@ -271,7 +269,7 @@ export const createGitHubService = (token: string) => {
             }
           }
           `,
-          {owner, repo, pageSize: PAGE_SIZE, cursor},
+          {owner, repo, pageSize, cursor},
         );
 
       const connection: IssuePageResponse['repository']['issues'] =
@@ -341,7 +339,7 @@ export const createGitHubService = (token: string) => {
             }
           }
           `,
-          {owner, repo, pageSize: PAGE_SIZE, cursor},
+          {owner, repo, pageSize, cursor},
         );
 
       const connection: PullRequestPageResponse['repository']['pullRequests'] =
@@ -410,7 +408,7 @@ export const createGitHubService = (token: string) => {
           `,
           {
             searchQuery: `repo:${owner}/${repo} is:issue updated:>=${since}`,
-            pageSize: PAGE_SIZE,
+            pageSize,
             cursor,
           },
         );
@@ -482,7 +480,7 @@ export const createGitHubService = (token: string) => {
           `,
           {
             searchQuery: `repo:${owner}/${repo} is:pr is:merged updated:>=${since}`,
-            pageSize: PAGE_SIZE,
+            pageSize,
             cursor,
           },
         );

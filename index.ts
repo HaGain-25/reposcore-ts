@@ -63,6 +63,9 @@ cli
   .option('--keywords [items]', '이슈 선점 키워드 목록(쉼표 구분)', {
     default: "제가 하겠습니다,진행하겠습니다,할게요,I'll take this",
   })
+  .option('--page-size <number>', '한 번에 가져올 항목 수 (1~100)', {
+    default: '$PAGE_SIZE',
+  })
   .action(
     async (
       repos: string[],
@@ -75,6 +78,7 @@ cli
         sortOrder: string;
         claims?: boolean;
         keywords?: string;
+        pageSize?: number | string;
       },
     ) => {
       // CLI 옵션값을 내부에서 사용할 형태로 정규화합니다.
@@ -91,6 +95,13 @@ cli
       const outputDir = options.outputDir || 'output';
       const sortBy = String(options.sortBy || 'score').toLowerCase();
       const sortOrder = String(options.sortOrder || 'desc').toLowerCase();
+
+      const rawPageSize =
+        options.pageSize === '$PAGE_SIZE'
+          ? Bun.env.PAGE_SIZE ?? 100
+          : options.pageSize;
+      const pageSize = Number(rawPageSize);
+
       const errors: string[] = [];
 
       const isClaimsMode = !!options.claims;
@@ -145,6 +156,12 @@ cli
         );
       }
 
+      if (!Number.isInteger(pageSize) || pageSize < 1 || pageSize > 100) {
+        errors.push(
+          `오류: --page-size 값은 1 이상 100 이하의 정수여야 합니다. (입력값: ${options.pageSize})`,
+        );
+      }
+
       if (repos.length === 0) {
         errors.push(
           '오류: 최소 하나 이상의 저장소(owner/repo)를 입력해야 합니다.',
@@ -178,7 +195,7 @@ cli
       }
 
       // GitHub API 호출을 위한 서비스 객체를 생성합니다.
-      const githubService = createGitHubService(token) as FullGitHubService;
+      const githubService = createGitHubService(token, pageSize) as FullGitHubService;
 
       // --claims 옵션이 있으면 점수 계산 대신 이슈 선점 현황만 조회합니다.
       if (isClaimsMode) {
