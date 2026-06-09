@@ -194,8 +194,7 @@ cli
         process.exit(1);
       }
 
-      // GitHub API 호출을 위한 서비스 객체를 생성합니다.
-      const githubService = createGitHubService(token, pageSize) as FullGitHubService;
+      const githubService = createGitHubService(token) as FullGitHubService;
 
       // --claims 옵션이 있으면 점수 계산 대신 이슈 선점 현황만 조회합니다.
       if (isClaimsMode) {

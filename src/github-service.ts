@@ -26,6 +26,7 @@ interface ClaimsPageResponse {
           }[];
         };
       }[];
+      pageInfo: PageInfo;
     };
   };
 }
@@ -69,6 +70,8 @@ interface PullRequestSearchResponse {
     pageInfo: PageInfo;
   };
 }
+
+const PAGE_SIZE = 100;
 
 /**
  * GitHub 라벨명을 내부 기여 카테고리로 정규화합니다.
@@ -212,7 +215,7 @@ export const countByCategory = (
  * @param token GitHub Personal Access Token
  * @returns 저장소 상세 데이터와 이슈 선점 현황을 조회하는 서비스 객체
  */
-export const createGitHubService = (token: string, pageSize = 100) => {
+export const createGitHubService = (token: string) => {
   const githubGraphQL = graphql.defaults({
     headers: {
       authorization: `token ${token}`,
@@ -269,7 +272,7 @@ export const createGitHubService = (token: string, pageSize = 100) => {
             }
           }
           `,
-          {owner, repo, pageSize, cursor},
+          {owner, repo, pageSize: PAGE_SIZE, cursor},
         );
 
       const connection: IssuePageResponse['repository']['issues'] =
@@ -339,7 +342,7 @@ export const createGitHubService = (token: string, pageSize = 100) => {
             }
           }
           `,
-          {owner, repo, pageSize, cursor},
+          {owner, repo, pageSize: PAGE_SIZE, cursor},
         );
 
       const connection: PullRequestPageResponse['repository']['pullRequests'] =
@@ -408,7 +411,7 @@ export const createGitHubService = (token: string, pageSize = 100) => {
           `,
           {
             searchQuery: `repo:${owner}/${repo} is:issue updated:>=${since}`,
-            pageSize,
+            pageSize: PAGE_SIZE,
             cursor,
           },
         );
@@ -480,7 +483,7 @@ export const createGitHubService = (token: string, pageSize = 100) => {
           `,
           {
             searchQuery: `repo:${owner}/${repo} is:pr is:merged updated:>=${since}`,
-            pageSize,
+            pageSize: PAGE_SIZE,
             cursor,
           },
         );
@@ -556,69 +559,82 @@ export const createGitHubService = (token: string, pageSize = 100) => {
     keywords: string[],
     repoPath: string,
   ): Promise<RepoClaims> => {
-    const response = await githubGraphQL<ClaimsPageResponse>(
-      `
-      query($owner: String!, $repo: String!) {
-        repository(owner: $owner, name: $repo) {
-          issues(first: 50, states: OPEN, orderBy: {field: CREATED_AT, direction: DESC}) {
-            nodes {
-              number
-              title
-              url
-              comments(last: 10) {
-                nodes {
-                  body
-                  author { login }
-                  createdAt
+    const claimed: ClaimInfo[] = [];
+    const unclaimed: ClaimInfo[] = [];
+    let cursor: string | null = null;
+    let hasNextPage = true;
+
+    while (hasNextPage) {
+      const response: ClaimsPageResponse = await githubGraphQL<ClaimsPageResponse>(
+        `
+        query($owner: String!, $repo: String!, $pageSize: Int!, $cursor: String) {
+          repository(owner: $owner, name: $repo) {
+            issues(first: $pageSize, after: $cursor, states: OPEN, orderBy: {field: CREATED_AT, direction: DESC}) {
+              nodes {
+                number
+                title
+                url
+                comments(last: 10) {
+                  nodes {
+                    body
+                    author { login }
+                    createdAt
+                  }
                 }
+              }
+              pageInfo {
+                hasNextPage
+                endCursor
               }
             }
           }
         }
-      }
-      `,
-      {owner, repo},
-    );
+        `,
+        {owner, repo, pageSize: PAGE_SIZE, cursor},
+      );
 
-    const nodes = response.repository.issues.nodes;
-    const claimed: ClaimInfo[] = [];
-    const unclaimed: ClaimInfo[] = [];
+      const connection = response.repository.issues;
+      const nodes = connection.nodes;
 
-    for (const node of nodes) {
-      let matchedClaim: {
-        claimer: string;
-        keyword: string;
-        createdAt: string;
-      } | null = null;
-      // 최신 댓글부터 확인하여 가장 최근 선점 선언을 찾습니다.
-      const comments = [...node.comments.nodes].reverse();
+      for (const node of nodes) {
+        let matchedClaim: {
+          claimer: string;
+          keyword: string;
+          createdAt: string;
+        } | null = null;
+        
+        const comments = [...node.comments.nodes].reverse();
 
-      for (const comment of comments) {
-        const foundKeyword = keywords.find(k => comment.body.includes(k));
-        if (foundKeyword) {
-          matchedClaim = {
-            claimer: comment.author?.login ?? 'unknown',
-            keyword: foundKeyword,
-            createdAt: comment.createdAt,
-          };
-          break;
+        for (const comment of comments) {
+          const foundKeyword = keywords.find(k => comment.body.includes(k));
+          if (foundKeyword) {
+            matchedClaim = {
+              claimer: comment.author?.login ?? 'unknown',
+              keyword: foundKeyword,
+              createdAt: comment.createdAt,
+            };
+            break;
+          }
+        }
+
+        const info: ClaimInfo = {
+          issueNumber: node.number,
+          title: node.title,
+          url: node.url,
+          claimedBy: matchedClaim?.claimer ?? null,
+          matchedKeyword: matchedClaim?.keyword ?? null,
+          claimedAt: matchedClaim?.createdAt ?? null,
+      };
+
+        if (matchedClaim) {
+          claimed.push(info);
+        } else {
+          unclaimed.push(info);
         }
       }
 
-      const info: ClaimInfo = {
-        issueNumber: node.number,
-        title: node.title,
-        url: node.url,
-        claimedBy: matchedClaim?.claimer ?? null,
-        matchedKeyword: matchedClaim?.keyword ?? null,
-        claimedAt: matchedClaim?.createdAt ?? null,
-      };
-
-      if (matchedClaim) {
-        claimed.push(info);
-      } else {
-        unclaimed.push(info);
-      }
+      cursor = connection.pageInfo.endCursor;
+      hasNextPage = connection.pageInfo.hasNextPage && cursor !== null;
     }
 
     return {repoPath, claimed, unclaimed};
