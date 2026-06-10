@@ -582,8 +582,56 @@ export const createGitHubService = (token: string, pageSize = PAGE_SIZE) => {
   const getAllOpenIssuesWithComments = async (
     owner: string,
     repo: string,
-  ): Promise<ClaimsIssueNode[]> => {
-    const issues: ClaimsIssueNode[] = [];
+    keywords: string[],
+    repoPath: string,
+  ): Promise<RepoClaims> => {
+    const issueToOpenPr = new Map<number, {number: number; url: string}>();
+    let prCursor: string | null = null;
+    let prHasNextPage = true;
+
+    while (prHasNextPage) {
+      const prResponse: OpenPrPageResponse =
+        await githubGraphQL<OpenPrPageResponse>(
+          `
+        query($owner: String!, $repo: String!, $pageSize: Int!, $cursor: String) {
+          repository(owner: $owner, name: $repo) {
+            pullRequests(first: $pageSize, after: $cursor, states: OPEN) {
+              nodes {
+                number
+                url
+                body
+              }
+              pageInfo {
+                hasNextPage
+                endCursor
+              }
+            }
+          }
+        }
+        `,
+          {owner, repo, pageSize: PAGE_SIZE, cursor: prCursor},
+        );
+
+      const prConnection: OpenPrPageResponse['repository']['pullRequests'] =
+        prResponse.repository.pullRequests;
+
+      for (const pr of prConnection.nodes) {
+        const body = pr.body ?? '';
+        const matches = body.matchAll(/#(\d+)/g);
+        for (const match of matches) {
+          const issueNum = parseInt(match[1]!, 10);
+          if (!issueToOpenPr.has(issueNum)) {
+            issueToOpenPr.set(issueNum, {number: pr.number, url: pr.url});
+          }
+        }
+      }
+
+      prCursor = prConnection.pageInfo.endCursor;
+      prHasNextPage = prConnection.pageInfo.hasNextPage && prCursor !== null;
+    }
+
+    const claimed: ClaimInfo[] = [];
+    const unclaimed: ClaimInfo[] = [];
     let cursor: string | null = null;
     let hasNextPage = true;
 
