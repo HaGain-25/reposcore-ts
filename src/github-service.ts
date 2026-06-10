@@ -613,8 +613,16 @@ export const createGitHubService = (token: string, pageSize = PAGE_SIZE) => {
 
         const comments = [...node.comments.nodes].reverse();
 
+        const normalize = (text: string): string =>
+          text.replace(/\s+/g, '').toLowerCase();
+
         for (const comment of comments) {
-          const foundKeyword = keywords.find(k => comment.body.includes(k));
+          const normalizedBody = normalize(comment.body);
+
+          const foundKeyword = keywords.find(keyword =>
+            normalizedBody.includes(normalize(keyword)),
+          );
+
           if (foundKeyword) {
             matchedClaim = {
               claimer: comment.author?.login ?? 'unknown',
