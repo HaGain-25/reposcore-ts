@@ -111,6 +111,9 @@ interface GetDetailedRepoDataOptions {
 
 const PAGE_SIZE = 100;
 
+const normalizeWhitespace = (text: string): string =>
+  text.replace(/\s+/g, '').toLowerCase();
+
 /**
  * GitHub 라벨명을 내부 기여 카테고리로 정규화합니다.
  * @param label 정규화할 GitHub 라벨명
@@ -846,7 +849,10 @@ export const createGitHubService = (token: string, pageSize = PAGE_SIZE) => {
       const comments = [...node.comments.nodes].reverse();
 
       for (const comment of comments) {
-        const foundKeyword = keywords.find(k => comment.body.includes(k));
+        const normalizedBody = normalizeWhitespace(comment.body);
+        const foundKeyword = keywords.find(keyword =>
+          normalizedBody.includes(normalizeWhitespace(keyword)),
+        );
         if (foundKeyword) {
           matchedClaim = {
             claimer: comment.author?.login ?? 'unknown',
