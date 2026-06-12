@@ -852,8 +852,15 @@ export const createGitHubService = (token: string, pageSize = PAGE_SIZE) => {
       } | null = null;
 
       const comments = [...node.comments.nodes].reverse();
+      const now = Date.now();
+      const issueCategory = categorizeLabels(extractLabelNames(node.labels));
+      const CLAIM_WINDOW_MS =
+        issueCategory === 'doc' ? 24 * 60 * 60 * 1000 : 48 * 60 * 60 * 1000;
 
       for (const comment of comments) {
+        if (now - new Date(comment.createdAt).getTime() > CLAIM_WINDOW_MS) {
+          continue;
+        }
         const normalizedBody = normalizeWhitespace(comment.body);
         const foundKeyword = keywords.find(keyword =>
           normalizedBody.includes(normalizeWhitespace(keyword)),
