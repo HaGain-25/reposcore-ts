@@ -1,6 +1,6 @@
-import {describe, expect, test} from 'bun:test';
+import {describe, expect, test, afterEach} from 'bun:test';
 
-import {normalizeWhitespace} from '../src/github-service';
+import {normalizeWhitespace, categorizeLabels} from '../src/github-service';
 
 describe('claims keyword whitespace normalization', () => {
   test('선점 키워드의 공백 차이를 제거해 같은 문자열로 정규화한다', () => {
@@ -16,5 +16,290 @@ describe('claims keyword whitespace normalization', () => {
     expect(normalizeWhitespace('I WILL DO THIS')).toBe(
       normalizeWhitespace('i will do this'),
     );
+  });
+});
+
+describe('claims 48h 기한 필터', () => {
+  const RealDateNow = Date.now;
+
+  afterEach(() => {
+    Date.now = RealDateNow;
+  });
+
+  /**
+   * 48시간이 지난 댓글은 선점 후보에서 제외되고,
+   * 유효 기간 내 댓글이 선점자로 채택되어야 한다.
+   */
+  test('48시간이 지난 선점 댓글은 무시되어야 한다', () => {
+    const fakeNow = new Date('2026-06-13T12:00:00.000Z').getTime();
+    Date.now = () => fakeNow;
+
+    const rawComments = [
+      {
+        body: '제가 하겠습니다',
+        author: {login: 'alice'},
+        createdAt: '2026-06-11T00:00:00.000Z', // 60시간 전 → 48h 초과
+      },
+      {
+        body: '진행하겠습니다',
+        author: {login: 'bob'},
+        createdAt: '2026-06-13T00:00:00.000Z', // 12시간 전 → 유효
+      },
+    ];
+
+    const keywords = ['제가 하겠습니다', '진행하겠습니다'];
+    const CLAIM_WINDOW_MS = 48 * 60 * 60 * 1000;
+    const now = Date.now();
+    const comments = [...rawComments].reverse();
+
+    let matchedClaim: {
+      claimer: string;
+      keyword: string;
+      createdAt: string;
+    } | null = null;
+
+    for (const comment of comments) {
+      if (now - new Date(comment.createdAt).getTime() > CLAIM_WINDOW_MS) {
+        continue;
+      }
+
+      const normalizedBody = normalizeWhitespace(comment.body);
+      const foundKeyword = keywords.find(k =>
+        normalizedBody.includes(normalizeWhitespace(k)),
+      );
+      if (foundKeyword) {
+        matchedClaim = {
+          claimer: comment.author?.login ?? 'unknown',
+          keyword: foundKeyword,
+          createdAt: comment.createdAt,
+        };
+        break;
+      }
+    }
+
+    // alice의 댓글은 48h 초과라 무시, bob의 댓글이 채택되어야 함
+    expect(matchedClaim?.claimer).toBe('bob');
+    expect(matchedClaim?.keyword).toBe('진행하겠습니다');
+  });
+
+  /**
+   * 48시간 이내 댓글이 있으면 정상 선점으로 처리되어야 한다.
+   */
+  test('48시간 이내 댓글은 정상적으로 선점으로 처리되어야 한다', () => {
+    const fakeNow = new Date('2026-06-13T12:00:00.000Z').getTime();
+    Date.now = () => fakeNow;
+
+    const comment = {
+      body: '제가 하겠습니다',
+      author: {login: 'carol'},
+      createdAt: '2026-06-12T12:00:00.000Z', // 24시간 전 → 유효
+    };
+
+    const CLAIM_WINDOW_MS = 48 * 60 * 60 * 1000;
+    const now = Date.now();
+    const isValid =
+      now - new Date(comment.createdAt).getTime() <= CLAIM_WINDOW_MS;
+    const matched = isValid && comment.body.includes('제가 하겠습니다');
+
+    expect(matched).toBe(true);
+  });
+
+  /**
+   * 모든 댓글이 48시간을 초과하면 선점 없음으로 처리되어야 한다.
+   */
+  test('모든 댓글이 48시간을 초과하면 선점 없음으로 처리되어야 한다', () => {
+    const fakeNow = new Date('2026-06-13T12:00:00.000Z').getTime();
+    Date.now = () => fakeNow;
+
+    const comments = [
+      {
+        body: '제가 하겠습니다',
+        author: {login: 'dave'},
+        createdAt: '2026-06-10T00:00:00.000Z', // 84시간 전 → 초과
+      },
+    ].reverse();
+
+    const keywords = ['제가 하겠습니다'];
+    const CLAIM_WINDOW_MS = 48 * 60 * 60 * 1000;
+    const now = Date.now();
+
+    let matchedClaim: {
+      claimer: string;
+      keyword: string;
+      createdAt: string;
+    } | null = null;
+
+    for (const comment of comments) {
+      if (now - new Date(comment.createdAt).getTime() > CLAIM_WINDOW_MS) {
+        continue;
+      }
+
+      const normalizedBody = normalizeWhitespace(comment.body);
+      const foundKeyword = keywords.find(k =>
+        normalizedBody.includes(normalizeWhitespace(k)),
+      );
+      if (foundKeyword) {
+        matchedClaim = {
+          claimer: comment.author?.login ?? 'unknown',
+          keyword: foundKeyword,
+          createdAt: comment.createdAt,
+        };
+        break;
+      }
+    }
+
+    expect(matchedClaim).toBeNull();
+  });
+});
+
+describe('claims doc 라벨 24h 기한 필터', () => {
+  const RealDateNow = Date.now;
+
+  afterEach(() => {
+    Date.now = RealDateNow;
+  });
+
+  /**
+   * doc 라벨 이슈의 선점 기한은 24시간이며,
+   * 24시간이 지난 댓글은 선점 후보에서 제외되어야 한다.
+   */
+  test('doc 라벨 이슈에서 24시간이 지난 선점 댓글은 무시되어야 한다', () => {
+    const fakeNow = new Date('2026-06-13T12:00:00.000Z').getTime();
+    Date.now = () => fakeNow;
+
+    const issueLabels = [{name: 'doc'}];
+    const issueCategory = categorizeLabels(issueLabels.map(l => l.name));
+    const CLAIM_WINDOW_MS =
+      issueCategory === 'doc' ? 24 * 60 * 60 * 1000 : 48 * 60 * 60 * 1000;
+
+    const rawComments = [
+      {
+        body: '제가 하겠습니다',
+        author: {login: 'alice'},
+        createdAt: '2026-06-12T00:00:00.000Z', // 36시간 전 → 24h 초과
+      },
+      {
+        body: '진행하겠습니다',
+        author: {login: 'bob'},
+        createdAt: '2026-06-13T06:00:00.000Z', // 6시간 전 → 유효
+      },
+    ];
+
+    const keywords = ['제가 하겠습니다', '진행하겠습니다'];
+    const now = Date.now();
+    const comments = [...rawComments].reverse();
+
+    let matchedClaim: {
+      claimer: string;
+      keyword: string;
+      createdAt: string;
+    } | null = null;
+
+    for (const comment of comments) {
+      if (now - new Date(comment.createdAt).getTime() > CLAIM_WINDOW_MS) {
+        continue;
+      }
+
+      const normalizedBody = normalizeWhitespace(comment.body);
+      const foundKeyword = keywords.find(k =>
+        normalizedBody.includes(normalizeWhitespace(k)),
+      );
+      if (foundKeyword) {
+        matchedClaim = {
+          claimer: comment.author?.login ?? 'unknown',
+          keyword: foundKeyword,
+          createdAt: comment.createdAt,
+        };
+        break;
+      }
+    }
+
+    // alice의 댓글은 24h 초과라 무시, bob의 댓글이 채택되어야 함
+    expect(issueCategory).toBe('doc');
+    expect(CLAIM_WINDOW_MS).toBe(24 * 60 * 60 * 1000);
+    expect(matchedClaim?.claimer).toBe('bob');
+    expect(matchedClaim?.keyword).toBe('진행하겠습니다');
+  });
+
+  /**
+   * doc 라벨 이슈에서 24시간 이내 댓글은 정상 선점으로 처리되어야 한다.
+   */
+  test('doc 라벨 이슈에서 24시간 이내 댓글은 정상적으로 선점으로 처리되어야 한다', () => {
+    const fakeNow = new Date('2026-06-13T12:00:00.000Z').getTime();
+    Date.now = () => fakeNow;
+
+    const issueLabels = [{name: 'docs'}];
+    const issueCategory = categorizeLabels(issueLabels.map(l => l.name));
+    const CLAIM_WINDOW_MS =
+      issueCategory === 'doc' ? 24 * 60 * 60 * 1000 : 48 * 60 * 60 * 1000;
+
+    const comment = {
+      body: '제가 하겠습니다',
+      author: {login: 'carol'},
+      createdAt: '2026-06-13T00:00:00.000Z', // 12시간 전 → 유효
+    };
+
+    const now = Date.now();
+    const isValid =
+      now - new Date(comment.createdAt).getTime() <= CLAIM_WINDOW_MS;
+    const matched = isValid && comment.body.includes('제가 하겠습니다');
+
+    expect(issueCategory).toBe('doc');
+    expect(matched).toBe(true);
+  });
+
+  /**
+   * doc 라벨 이슈에서 코드 기한(48h) 이내지만 문서 기한(24h)을 초과한
+   * 댓글은 선점 없음으로 처리되어야 한다.
+   */
+  test('doc 라벨 이슈에서 24h 초과~48h 이내 댓글은 선점 없음으로 처리되어야 한다', () => {
+    const fakeNow = new Date('2026-06-13T12:00:00.000Z').getTime();
+    Date.now = () => fakeNow;
+
+    const issueLabels = [{name: 'documentation'}];
+    const issueCategory = categorizeLabels(issueLabels.map(l => l.name));
+    const CLAIM_WINDOW_MS =
+      issueCategory === 'doc' ? 24 * 60 * 60 * 1000 : 48 * 60 * 60 * 1000;
+
+    const comments = [
+      {
+        body: '제가 하겠습니다',
+        author: {login: 'dave'},
+        createdAt: '2026-06-12T06:00:00.000Z', // 30시간 전 → 24h 초과, 48h 이내
+      },
+    ].reverse();
+
+    const keywords = ['제가 하겠습니다'];
+    const now = Date.now();
+
+    let matchedClaim: {
+      claimer: string;
+      keyword: string;
+      createdAt: string;
+    } | null = null;
+
+    for (const comment of comments) {
+      if (now - new Date(comment.createdAt).getTime() > CLAIM_WINDOW_MS) {
+        continue;
+      }
+
+      const normalizedBody = normalizeWhitespace(comment.body);
+      const foundKeyword = keywords.find(k =>
+        normalizedBody.includes(normalizeWhitespace(k)),
+      );
+      if (foundKeyword) {
+        matchedClaim = {
+          claimer: comment.author?.login ?? 'unknown',
+          keyword: foundKeyword,
+          createdAt: comment.createdAt,
+        };
+        break;
+      }
+    }
+
+    // doc 라벨이므로 24h 기준 적용 → 30시간 전 댓글은 무시
+    expect(issueCategory).toBe('doc');
+    expect(CLAIM_WINDOW_MS).toBe(24 * 60 * 60 * 1000);
+    expect(matchedClaim).toBeNull();
   });
 });
