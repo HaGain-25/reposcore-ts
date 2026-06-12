@@ -256,7 +256,8 @@ export const countByCategory = (
 /**
  * GitHub GraphQL API를 사용하는 서비스 객체를 생성합니다.
  * @param token GitHub Personal Access Token
- * @returns 저장소 상세 데이터와 이슈 선점 현황을 조회하는 서비스 객체
+ * @param pageSize 한 번에 가져올 항목 수 (기본값: 100)
+ * @returns 저장소 상세 데이터, 이슈 선점 현황, 저장소 존재 검증 기능을 제공하는 서비스 객체
  */
 export const createGitHubService = (token: string, pageSize = PAGE_SIZE) => {
   const githubGraphQL = graphql.defaults({
@@ -899,8 +900,52 @@ export const createGitHubService = (token: string, pageSize = PAGE_SIZE) => {
     return {repoPath, claimed, unclaimed};
   };
 
+  /**
+   * 입력된 저장소 목록이 GitHub에 실제로 존재하고 접근 가능한지 한 번의 GraphQL 쿼리로 검증합니다.
+   * 존재하지 않거나 접근할 수 없는 저장소의 repoPath 목록을 반환합니다.
+   * @param repos 검증할 저장소 목록 (owner, repoName, repoPath)
+   * @returns 존재하지 않거나 접근 불가한 저장소 경로 목록
+   */
+  const validateRepositoriesExist = async (
+    repos: {owner: string; repoName: string; repoPath: string}[],
+  ): Promise<string[]> => {
+    const varDefs = repos
+      .map((_, i) => `$o${i}: String!, $n${i}: String!`)
+      .join(', ');
+    const fields = repos
+      .map(
+        (_, i) =>
+          `r${i}: repository(owner: $o${i}, name: $n${i}) { nameWithOwner }`,
+      )
+      .join('\n');
+
+    const query = `query(${varDefs}) {\n${fields}\n}`;
+
+    const variables: Record<string, string> = {};
+    repos.forEach((repo, i) => {
+      variables[`o${i}`] = repo.owner;
+      variables[`n${i}`] = repo.repoName;
+    });
+
+    type ExistenceData = Record<string, {nameWithOwner: string} | null>;
+
+    let data: ExistenceData;
+    try {
+      data = await githubGraphQL<ExistenceData>(query, variables);
+    } catch (error: unknown) {
+      // NOT_FOUND 등 errors가 있어도 부분 데이터는 error.data에 담겨 옴
+      const partial = (error as {data?: ExistenceData}).data;
+      if (!partial) throw error;
+      data = partial;
+    }
+
+    // 응답이 null인 저장소 = 존재하지 않거나 접근 불가
+    return repos.filter((_, i) => !data[`r${i}`]).map(repo => repo.repoPath);
+  };
+
   return {
     getDetailedRepoData,
     getRecentClaimsData,
+    validateRepositoriesExist,
   };
 };
