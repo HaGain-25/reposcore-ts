@@ -162,7 +162,25 @@ export interface ClaimService {
 }
 
 /**
+ * 저장소 존재 여부 검증을 위한 서비스 인터페이스.
+ */
+export interface RepoValidationService {
+  /**
+   * 입력된 저장소 목록이 GitHub에 실제로 존재하고 접근 가능한지 검증합니다.
+   * 여러 저장소를 하나의 GraphQL 쿼리로 묶어 확인하며,
+   * 존재하지 않거나 접근할 수 없는 저장소의 경로 목록을 반환합니다.
+   * @param repos 검증할 저장소 목록
+   * @returns 존재하지 않거나 접근 불가한 저장소 경로 목록
+   */
+  validateRepositoriesExist(
+    repos: {owner: string; repoName: string; repoPath: string}[],
+  ): Promise<string[]>;
+}
+
+/**
  * 모든 GitHub 서비스 기능을 포함하는 통합 인터페이스.
  * `createGitHubService` 함수가 반환해야 하는 타입입니다.
  */
-export type FullGitHubService = GitHubServiceCore & ClaimService;
+export type FullGitHubService = GitHubServiceCore &
+  ClaimService &
+  RepoValidationService;
