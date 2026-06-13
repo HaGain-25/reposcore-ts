@@ -237,36 +237,29 @@ cli
 
       // --claims 옵션이 있으면 점수 계산 대신 이슈 선점 현황만 조회합니다.
       if (isClaimsMode) {
-        const claimTasks = parsedRepos.map(
-          async ({repoPath, owner, repoName}) => {
-            return await githubService.getRecentClaimsData(
+        // 조회 실패 여부를 추적하는 플래그입니다.
+        // 루프 도중에 즉시 종료하지 않고 모든 저장소를 끝까지 처리한 뒤,
+        // 루프가 완전히 끝난 후 이 플래그를 확인하여 종료 코드를 결정합니다.
+        let hasClaimFailure = false;
+
+        for (const {repoPath, owner, repoName} of parsedRepos) {
+          try {
+            const claims = await githubService.getRecentClaimsData(
               owner,
               repoName,
               claimKeywords,
               repoPath,
               useCache,
             );
-          },
-        );
-
-        const claimResults = await Promise.allSettled(claimTasks);
-        let hasClaimFailure = false;
-
-        claimResults.forEach((result, i) => {
-          const {repoPath} = parsedRepos[i]!;
-          if (result.status === 'fulfilled') {
-            printClaims(result.value);
-          } else {
+            printClaims(claims);
+          } catch (err) {
             hasClaimFailure = true;
-            const msg =
-              result.reason instanceof Error
-                ? result.reason.message
-                : String(result.reason);
+            const msg = err instanceof Error ? err.message : String(err);
             console.error(
               `오류: '${repoPath}'의 선점 현황을 조회할 수 없습니다. (${msg})`,
             );
           }
-        });
+        }
 
         if (hasClaimFailure) {
           process.exit(1);
@@ -326,12 +319,10 @@ cli
           repoSummaries.push(repoSummary);
 
           console.log(`[${repoPath}] CSV 저장: ${written.csv}`);
-          if (written.txt) {
+          if (written.txt)
             console.log(`[${repoPath}] TXT 저장: ${written.txt}`);
-          }
-          if (written.html) {
+          if (written.html)
             console.log(`[${repoPath}] HTML 저장: ${written.html}`);
-          }
         } else {
           hasFailure = true;
           const reason =
