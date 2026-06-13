@@ -155,6 +155,12 @@ cli
         );
       }
 
+      if (formats.length === 0) {
+        errors.push(
+          '오류: --format에는 csv, txt, html 중 하나 이상의 출력 형식을 입력하세요.',
+        );
+      }
+
       const invalidFormats = formats.filter(
         format => !supportedFormats.includes(format as SupportedFormat),
       );
