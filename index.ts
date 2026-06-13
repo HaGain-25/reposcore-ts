@@ -308,10 +308,12 @@ cli
           repoSummaries.push(repoSummary);
 
           console.log(`[${repoPath}] CSV 저장: ${written.csv}`);
-          if (written.txt)
+          if (written.txt) {
             console.log(`[${repoPath}] TXT 저장: ${written.txt}`);
-          if (written.html)
+          }
+          if (written.html) {
             console.log(`[${repoPath}] HTML 저장: ${written.html}`);
+          }
         } else {
           hasFailure = true;
           const reason =
