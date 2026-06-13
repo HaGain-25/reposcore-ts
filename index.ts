@@ -41,31 +41,6 @@ function parseRepoPath(repoPath: string) {
   };
 }
 
-/**
- * CLI 원본 인자에서 --keywords 옵션이 명시적으로 입력되었는지와 값을 확인합니다.
- */
-function getExplicitKeywordsValue(argv: string[]): string | null {
-  const optionIndex = argv.findIndex(
-    arg => arg === '--keywords' || arg.startsWith('--keywords='),
-  );
-
-  if (optionIndex === -1) {
-    return null;
-  }
-
-  const option = argv[optionIndex]!;
-  if (option.startsWith('--keywords=')) {
-    return option.slice('--keywords='.length);
-  }
-
-  const value = argv[optionIndex + 1];
-  if (!value || value.startsWith('-')) {
-    return '';
-  }
-
-  return value;
-}
-
 cli
   .command('[...repos]', '대상 저장소 목록 (예: owner/repo1 owner/repo2)')
   .option('-t, --token <token>', 'GitHub Personal Access Token', {
@@ -86,9 +61,13 @@ cli
     default: 'desc',
   })
   .option('--claims', '최근 이슈 선점 현황을 조회합니다')
-  .option('--keywords [items]', '이슈 선점 키워드 목록(쉼표 구분)', {
-    default: "제가 하겠습니다,진행하겠습니다,할게요,I'll take this",
-  })
+  .option(
+    '--keywords [items]',
+    "이슈 선점 키워드 목록(쉼표 구분, 기본값: 제가 하겠습니다,진행하겠습니다,할게요,I'll take this)",
+    {
+      type: [String],
+    },
+  )
   .option('--page-size <number>', '한 번에 가져올 항목 수 (1~100)', {
     default: '$PAGE_SIZE',
   })
@@ -104,7 +83,7 @@ cli
         sortBy: string;
         sortOrder: string;
         claims?: boolean;
-        keywords?: string;
+        keywords?: string | string[];
         pageSize?: number | string;
       },
     ) => {
@@ -141,23 +120,20 @@ cli
         "I'll take this",
       ];
 
-      const explicitKeywordsValue = getExplicitKeywordsValue(process.argv);
-      const rawKeywords =
-        explicitKeywordsValue ??
-        (typeof options.keywords === 'string'
+      const rawKeywords = Array.isArray(options.keywords)
+        ? options.keywords.join(',')
+        : typeof options.keywords === 'string'
           ? options.keywords
-          : DEFAULT_KEYWORDS.join(','));
+          : DEFAULT_KEYWORDS.join(',');
 
       const claimKeywords = rawKeywords
         .split(',')
         .map(k => k.trim())
-        .filter(Boolean);
+        .filter(
+          keyword => keyword && keyword !== 'undefined' && keyword !== '0',
+        );
 
-      if (
-        isClaimsMode &&
-        explicitKeywordsValue !== null &&
-        claimKeywords.length === 0
-      ) {
+      if (isClaimsMode && claimKeywords.length === 0) {
         errors.push(
           '오류: --keywords에는 하나 이상의 선점 키워드를 입력해야 합니다.',
         );
