@@ -179,7 +179,7 @@ cli
 
       if (!Number.isInteger(pageSize) || pageSize < 1 || pageSize > 100) {
         errors.push(
-          `오류: --page-size 값은 1 이상 100 이하의 정수여야 합니다. (입력값: ${options.pageSize})`,
+          `오류: --page-size 값은 1 이상 100 이하의 정수여야 합니다. (입력값: ${rawPageSize})`,
         );
       }
 
