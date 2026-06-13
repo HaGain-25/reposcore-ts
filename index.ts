@@ -19,6 +19,7 @@ import {
   type SupportedSortOrder,
 } from './src/sort';
 import {type FullGitHubService} from './src/types';
+import {setVerbose, logVerbose} from './src/logger';
 
 const cli = cac('reposcore-ts');
 cli.version(pkg.version);
@@ -71,6 +72,7 @@ cli
   .option('--page-size <number>', '한 번에 가져올 항목 수 (1~100)', {
     default: '$PAGE_SIZE',
   })
+  .option('--verbose', '진단 및 진행 로그를 출력합니다')
   .action(
     async (
       repos: string[],
@@ -85,8 +87,10 @@ cli
         claims?: boolean;
         keywords?: string | string[];
         pageSize?: number | string;
+        verbose?: boolean;
       },
     ) => {
+      setVerbose(!!options.verbose);
       // CLI 옵션값을 내부에서 사용할 형태로 정규화합니다.
       const token =
         options.token === '$GITHUB_TOKEN'
@@ -273,8 +277,8 @@ cli
         return;
       }
 
-      console.log(`형식: ${formats.join(', ')}`);
-      console.log(`저장소: ${repos.join(', ')}`);
+      logVerbose(`형식: ${formats.join(', ')}`);
+      logVerbose(`저장소: ${repos.join(', ')}`);
 
       // ── [개선] 일반 기여도 점수 산정 모드 병렬 처리 (Promise.allSettled) ──────
       const tasks = parsedRepos.map(async ({repoPath, owner, repoName}) => {
@@ -324,11 +328,11 @@ cli
           repoDataList.push(repoData);
           repoSummaries.push(repoSummary);
 
-          console.log(`[${repoPath}] CSV 저장: ${written.csv}`);
+          logVerbose(`[${repoPath}] CSV 저장: ${written.csv}`);
           if (written.txt)
-            console.log(`[${repoPath}] TXT 저장: ${written.txt}`);
+            logVerbose(`[${repoPath}] TXT 저장: ${written.txt}`);
           if (written.html)
-            console.log(`[${repoPath}] HTML 저장: ${written.html}`);
+            logVerbose(`[${repoPath}] HTML 저장: ${written.html}`);
         } else {
           hasFailure = true;
           const reason =
@@ -361,12 +365,12 @@ cli
         },
         outputDir,
       );
-      console.log(`[합산] CSV 저장: ${written.csv}`);
+      console.error(`[합산] CSV 저장: ${written.csv}`);
       if (written.txt) {
-        console.log(`[합산] TXT 저장: ${written.txt}`);
+        console.error(`[합산] TXT 저장: ${written.txt}`);
       }
       if (written.html) {
-        console.log(`[합산] HTML 저장: ${written.html}`);
+        console.error(`[합산] HTML 저장: ${written.html}`);
       }
     },
   );
