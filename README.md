@@ -14,6 +14,7 @@ bun install
 ### CLI 실행
 
 여러 개의 저장소를 한 번에 분석할 수 있습니다.
+여러 개의 저장소를 한 번에 분석할 수 있습니다. (**최소 1개 이상의 저장소 인자가 필수입니다.**)
 
 ```bash
 # 기본 실행 예시
@@ -48,6 +49,7 @@ bun run index.ts oss2026hnu/reposcore-ts --no-cache
 ### 사용 시 주의사항
 
 - 저장소는 `owner/repo` 형식으로 입력해야 합니다.
+- 저장소 인자는 최소 1개 이상 입력해야 합니다.
 - 여러 저장소를 분석할 때는 공백으로 구분하여 입력합니다.
 - `--token`을 생략하면 `GITHUB_TOKEN` 환경변수를 사용합니다.
 - `--format`은 `csv`, `txt`, `html` 값을 사용할 수 있습니다.
@@ -57,6 +59,8 @@ bun run index.ts oss2026hnu/reposcore-ts --no-cache
 - `--since`는 ISO8601 형식의 날짜 문자열을 입력해야 합니다.
 
 ## Synopsis
+
+> 💡 저장소 인자는 최소 1개 이상 입력해야 합니다.
 
 ```text
 reposcore-ts/1.0.0
