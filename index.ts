@@ -91,6 +91,7 @@ cli
       },
     ) => {
       setVerbose(!!options.verbose);
+
       // CLI 옵션값을 내부에서 사용할 형태로 정규화합니다.
       const token =
         options.token === '$GITHUB_TOKEN'
@@ -329,8 +330,7 @@ cli
           repoSummaries.push(repoSummary);
 
           logVerbose(`[${repoPath}] CSV 저장: ${written.csv}`);
-          if (written.txt)
-            logVerbose(`[${repoPath}] TXT 저장: ${written.txt}`);
+          if (written.txt) logVerbose(`[${repoPath}] TXT 저장: ${written.txt}`);
           if (written.html)
             logVerbose(`[${repoPath}] HTML 저장: ${written.html}`);
         } else {
