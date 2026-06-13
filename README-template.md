@@ -26,6 +26,36 @@ bun run index.ts oss2026hnu/reposcore-cs oss2026hnu/reposcore-ts oss2026hnu/repo
 bun run index.ts oss2026hnu/reposcore-ts --token YOUR_GITHUB_TOKEN
 ```
 
+### CLI 옵션 사용 예시
+
+```bash
+# TXT 형식으로 결과 저장
+bun run index.ts oss2026hnu/reposcore-ts --format txt --output-dir output/reports
+
+# 사용자 ID 기준 오름차순 정렬
+bun run index.ts oss2026hnu/reposcore-ts --sort-by id --sort-order asc
+
+# 최근 이슈 선점 현황 조회
+bun run index.ts oss2026hnu/reposcore-ts --claims
+
+# 선점 키워드를 직접 지정하여 조회
+bun run index.ts oss2026hnu/reposcore-ts --claims --keywords "제가 하겠습니다,진행하겠습니다,할게요"
+
+# 캐시를 사용하지 않고 GitHub API를 새로 호출
+bun run index.ts oss2026hnu/reposcore-ts --no-cache
+```
+
+### 사용 시 주의사항
+
+- 저장소는 `owner/repo` 형식으로 입력해야 합니다.
+- 여러 저장소를 분석할 때는 공백으로 구분하여 입력합니다.
+- `--token`을 생략하면 `GITHUB_TOKEN` 환경변수를 사용합니다.
+- `--format`은 `csv`, `txt`, `html` 값을 사용할 수 있습니다.
+- `--sort-by`는 `score`, `id` 값을 사용할 수 있습니다.
+- `--sort-order`는 `asc`, `desc` 값을 사용할 수 있습니다.
+- `--keywords`는 쉼표로 구분된 문자열을 입력해야 하며, 빈 값은 사용할 수 없습니다.
+- `--since`는 ISO8601 형식의 날짜 문자열을 입력해야 합니다.
+
 ## Synopsis
 
 ```text
